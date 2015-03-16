@@ -17,3 +17,6 @@ The above example creates an new ElasticSearch node in the us-east-1a availabili
 ```fab create_host:ec2_placement='us-east-1a'```
 ##### Group your nodes by environment
 ```fab create_host:environment='dev'```
+
+#### Monitoring
+When the instance is setup the Marvel plugin is installed so keeping an eye on your cluster is easy. On any node in your cluster got to http://HOST:9200/_plugin/marvel
