@@ -6,6 +6,21 @@ Fab Script For Deploying Nodes to an AWS ElasticSearch Cluster
 
 The above example creates an new ElasticSearch node in the us-east-1a availability zone. If this is the first node then it will be the master, otherwise it will discover the master and add itself to the cluster.
 
+#### Installation
+Install [Fabric](http://www.fabfile.org/installing.html)
+```pip install fabric```
+```pip install paramiko```
+
+Install [Boto](https://github.com/boto/boto#installation)
+```pip install boto```
+
+[Configure Boto](http://docs.pythonboto.org/en/latest/boto_config_tut.html) by saving you AWS key and secret to ~/.boto
+```
+[Credentials]
+aws_access_key_id = <your_access_key_here>
+aws_secret_access_key = <your_secret_key_here>
+```
+
 #### Examples
 ##### Create a new node in a specific cluster
 ```fab create_host:cluster_name=Thor```
