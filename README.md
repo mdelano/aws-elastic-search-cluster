@@ -25,7 +25,7 @@ aws_secret_access_key = <your_secret_key_here>
 ```
 
 ##### Finally, install this project
-```git clone foo```
+```git clone git@github.com:mdelano/aws-elastic-search-cluster.git```
 
 #### Examples
 ##### Create a new node in a specific cluster
