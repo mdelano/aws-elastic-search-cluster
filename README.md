@@ -24,6 +24,9 @@ aws_access_key_id = <your_access_key_here>
 aws_secret_access_key = <your_secret_key_here>
 ```
 
+##### Finally, install this project
+```git clone foo```
+
 #### Examples
 ##### Create a new node in a specific cluster
 ```$ fab create_host:cluster_name=Thor```
