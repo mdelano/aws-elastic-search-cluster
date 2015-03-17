@@ -9,9 +9,10 @@ The above example creates an new ElasticSearch node in the us-east-1a availabili
 #### Installation
 There are 3 required dependencies: [Python](https://www.python.org/downloads/), [Paramiko](http://paramiko-www.readthedocs.org/en/latest/installing.html), and [Boto](https://github.com/boto/boto#installation)
 ##### Install [Fabric](http://www.fabfile.org/installing.html)
-```$ pip install fabric```
- -
-```$ pip install paramiko```
+```
+$ pip install fabric
+$ pip install paramiko
+```
 
 ##### Install [Boto](https://github.com/boto/boto#installation)
 ```$ pip install boto```
