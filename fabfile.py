@@ -1,5 +1,7 @@
 #!python
 import os
+import time
+import datetime
 from fabric.api import *
 from fabric.contrib import *
 from fabric.contrib.files import *
@@ -60,7 +62,7 @@ def boo(message):
 # cluster_name:     ElasticSeearch clusters have a name. Think of a good one.
 #
 ################################################################
-def create_host(ami='ami-427a392a', instance_type='c3.large', ec2_region='us-east-1', ec2_placement='us-east-1a', environment='dev', cluster_name='elasticsearch'):
+def create_host(ami='ami-427a392a', instance_type='c3.large', ec2_region='us-east-1', ec2_placement='us-east-1a', environment='dev', cluster_name='elasticsearch', from_snapshot=None):
     env.CLUSTER_NAME = cluster_name
     env.ENVIRONMENT = environment
 
@@ -133,7 +135,9 @@ def create_host(ami='ami-427a392a', instance_type='c3.large', ec2_region='us-eas
     # Build out the new instance
     setup_host()
 
-
+    if(from_snapshot is not None):
+        time.sleep(10)
+        restore(s3_bucket='elasticsearch.backups.mediasilo.com',snapshot_name=from_snapshot)
 
 
 
@@ -153,22 +157,29 @@ def setup_host():
     sudo('apt-get install -y -q unzip')
 
     # Install ElasticSearch
-    sudo('wget https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.4.zip')
+    sudo('wget http://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.4.zip')
     sudo('unzip elasticsearch-1.4.4 -d /usr/local/elasticsearch')
     sudo('rm elasticsearch-1.4.4.zip')
-    with cd('/usr/local/elasticsearch/elasticsearch-1.4.4/'):
-        # Install ElasticSearch plugins
-        sudo('bin/plugin install elasticsearch/elasticsearch-cloud-aws/2.4.1')
-        sudo('bin/plugin -i elasticsearch/marvel/latest')
+
+    # Setup ElasticSearch to run as a daemon
+    source_file = './elasticsearch_init.d'
+    destination_file = 'elasticsearch'
+    upload_template(source_file, destination_file, context=env, mode=0644)
+    sudo('cp ~/elasticsearch /etc/init.d/elasticsearch')
+    sudo('chmod 777 /etc/init.d/elasticsearch')
 
     # elasticsearch.yml
     configure()
+
+    with cd('/usr/local/elasticsearch/elasticsearch-1.4.4/'):
+        # Install ElasticSearch plugins
+        sudo('bin/plugin install elasticsearch/elasticsearch-cloud-aws/2.4.1')
 
     # CopperEgg
     sudo('curl -sk http://uTwRdkAYClguDmFC@api.copperegg.com/rc.sh | sh')
 
     # Start ElasticSearch
-    sudo('/usr/local/elasticsearch/elasticsearch-1.4.4/bin/elasticsearch -Xmx2g -Xms2g -d', pty=False)
+    sudo('service elasticsearch start', pty=False)
 
     print yay('host setup complete')
 
@@ -294,6 +305,28 @@ def configure(instance_id=None, environment='dev', ec2_region='us-east-1'):
 
 
 
+def snapshot(s3_bucket, environment='dev', ec2_region='us-east-1'):
+    create_snapshot_repository_cmd = "curl -XPUT 'localhost:9200/_snapshot/"+CLUSTER_TAG_NAME+"_snapshot_repository' -d '{\"type\": \"s3\",\"settings\": {\"bucket\": \""+s3_bucket+"\",\"region\": \""+ec2_region+"\"}}'"
+    d = datetime.datetime.now()
+    create_snapshot_cmd = "curl -XPUT \"localhost:9200/_snapshot/"+CLUSTER_TAG_NAME+"_snapshot_repository/"+d.strftime('%m_%d_%y_%I-%M-%S%p').lower()+"\""
+
+    hosts = get_cluster_instances(environment, ec2_region)
+    with settings(host_string=hosts[0]):
+        run(create_snapshot_repository_cmd)
+        run(create_snapshot_cmd)
+
+
+
+
+def restore(s3_bucket, snapshot_name, ec2_region='us-east-1'):
+    create_snapshot_repository_cmd = "curl -XPUT 'localhost:9200/_snapshot/"+CLUSTER_TAG_NAME+"_snapshot_repository' -d '{\"type\": \"s3\",\"settings\": {\"bucket\": \""+s3_bucket+"\",\"region\": \""+ec2_region+"\"}}'"
+    restore_snapshot_cmd = "curl -XPOST \"localhost:9200/_snapshot/"+CLUSTER_TAG_NAME+"_snapshot_repository/"+snapshot_name+"/_restore\""
+
+    print info("Restoring snapshot " + snapshot_name + " from " + s3_bucket)
+    sudo(create_snapshot_repository_cmd)
+    sudo(restore_snapshot_cmd)
+
+
 ################################################################
 #
 # Set the hosts list for all nodes in the ElasticSearch cluster.
@@ -304,6 +337,32 @@ def configure(instance_id=None, environment='dev', ec2_region='us-east-1'):
 #
 ################################################################
 def cluster(environment='dev', ec2_region='us-east-1'):
+    env.hosts = get_cluster_instances(environment, ec2_region)
+
+
+
+################################################################
+#
+# Set the hosts from the first found node in the ElasticSearch cluster.
+# This tells fabric what hosts to run against.
+
+# See http://docs.fabfile.org/en/latest/usage/execution.html
+# for more info on the Fabric execution model
+#
+################################################################
+def any(environment='dev', ec2_region='us-east-1'):
+    hosts = get_cluster_instances(environment, ec2_region)
+    env.hosts = hosts[0]
+
+
+
+
+################################################################
+#
+# Finds all nodes in the cluster
+#
+################################################################
+def get_cluster_instances(environment='dev', ec2_region='us-east-1'):
     print cyan('finding instances in Application=') + magenta(APPLICATION) + cyan(' Environment=') + \
         magenta(environment)
     ec2 = boto.ec2.connect_to_region(ec2_region)
@@ -323,7 +382,8 @@ def cluster(environment='dev', ec2_region='us-east-1'):
     else:
         print red("no running instances found in Application=%s Environment=%s" %
                   (APPLICATION, environment))
-    env.hosts = hostlist
+
+    return hostlist
 
 
 
