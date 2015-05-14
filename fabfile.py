@@ -13,9 +13,6 @@ import boto.utils
 import time
 
 
-
-
-
 # Set Fabric environment vars
 env.shell               = "/bin/bash -c" # remove -l because otherwise sudo -u looks for the invoking user's .bash_profile
 env.forward_agent       = True
@@ -61,6 +58,7 @@ def boo(message):
 # environment:      This can be any environment identifier. I use dev, beta, prod, etc
 # cluster_name:     ElasticSeearch clusters have a name. Think of a good one.
 #
+# eg: create_host:ami-427a392a,c3.large,us-east-1,us-east-1a,dev,batman,03_25_2015_02-00-01
 ################################################################
 def create_host(ami='ami-427a392a', instance_type='c3.large', ec2_region='us-east-1', ec2_placement='us-east-1a', environment='dev', cluster_name='elasticsearch', from_snapshot=None):
     env.CLUSTER_NAME = cluster_name
@@ -174,6 +172,7 @@ def setup_host():
     with cd('/usr/local/elasticsearch/elasticsearch-1.4.4/'):
         # Install ElasticSearch plugins
         sudo('bin/plugin install elasticsearch/elasticsearch-cloud-aws/2.4.1')
+        sudo('bin/plugin -i elasticsearch/marvel/latest')
 
     # CopperEgg
     sudo('curl -sk http://uTwRdkAYClguDmFC@api.copperegg.com/rc.sh | sh')
@@ -320,7 +319,7 @@ def snapshot(s3_bucket, environment='dev', ec2_region='us-east-1'):
 
 def restore(s3_bucket, snapshot_name, ec2_region='us-east-1'):
     create_snapshot_repository_cmd = "curl -XPUT 'localhost:9200/_snapshot/"+CLUSTER_TAG_NAME+"_snapshot_repository' -d '{\"type\": \"s3\",\"settings\": {\"bucket\": \""+s3_bucket+"\",\"region\": \""+ec2_region+"\"}}'"
-    restore_snapshot_cmd = "curl -XPOST \"localhost:9200/_snapshot/"+CLUSTER_TAG_NAME+"_snapshot_repository/"+snapshot_name+"/_restore\""
+    restore_snapshot_cmd = "curl -XPOST \"localhost:9200/_snapshot/"+CLUSTER_TAG_NAME+"_snapshot_repository/"+snapshot_name+"/_restore\" -d '{\"indices\": \"phoenix,events,analytics\"}'"
 
     print info("Restoring snapshot " + snapshot_name + " from " + s3_bucket)
     sudo(create_snapshot_repository_cmd)
